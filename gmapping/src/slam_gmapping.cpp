@@ -304,13 +304,7 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
 
   double yaw = tf::getYaw(laser_pose.getRotation());
 
-  GMapping::OrientedPoint gmap_pose(laser_pose.getOrigin().x(),
-                                    laser_pose.getOrigin().y(),
-                                    yaw);
-  ROS_DEBUG("laser's pose wrt base: %.3f %.3f %.3f",
-            laser_pose.getOrigin().x(),
-            laser_pose.getOrigin().y(),
-            yaw);
+  
   
   // To account for lasers that are mounted upside-down, we determine the
   // min, max, and increment angles of the laser in the base frame.
@@ -334,11 +328,20 @@ SlamGMapping::initMapper(const sensor_msgs::LaserScan& scan)
   }
   
   gsp_laser_beam_count_ = scan.ranges.size();
+  ROS_DEBUG("Beam count: %d ", gsp_laser_beam_count_);
 
-  double angle_min = tf::getYaw(min_q);
-  double angle_max = tf::getYaw(max_q);
-  gsp_laser_angle_increment_ = scan.angle_increment;
+  angle_min = tf::getYaw(min_q);
+  angle_max = tf::getYaw(max_q);
+  gsp_laser_angle_increment_ = angle_min > angle_max ? -fabs(scan.angle_increment) : fabs(scan.angle_increment);
   ROS_DEBUG("Laser angles in base frame: min: %.3f max: %.3f inc: %.3f", angle_min, angle_max, gsp_laser_angle_increment_);
+
+  GMapping::OrientedPoint gmap_pose(laser_pose.getOrigin().x(),
+                                    laser_pose.getOrigin().y(),
+                                    (angle_min + angle_max) / 2);
+  ROS_DEBUG("laser's pose wrt base: %.3f %.3f %.3f",
+            laser_pose.getOrigin().x(),
+            laser_pose.getOrigin().y(),
+            (angle_min + angle_max) / 2);
 
   // setting maxRange and maxUrange here so we can set a reasonable default
   ros::NodeHandle private_nh_("~");
@@ -538,14 +541,14 @@ SlamGMapping::updateMap(const sensor_msgs::LaserScan& scan)
   boost::mutex::scoped_lock(map_mutex_);
   GMapping::ScanMatcher matcher;
   double* laser_angles = new double[scan.ranges.size()];
-  double theta = scan.angle_min;
+  double theta = angle_min;
   for(unsigned int i=0; i<scan.ranges.size(); i++)
   {
     if (gsp_laser_angle_increment_ < 0)
         laser_angles[scan.ranges.size()-i-1]=theta;
     else
         laser_angles[i]=theta;
-    theta += scan.angle_increment;
+    theta += gsp_laser_angle_increment_;
   }
 
   matcher.setLaserParameters(scan.ranges.size(), laser_angles,

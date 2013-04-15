@@ -57,6 +57,8 @@ class SlamGMapping
     GMapping::GridSlamProcessor* gsp_;
     GMapping::RangeSensor* gsp_laser_;
     double gsp_laser_angle_increment_;
+    double angle_min;
+    double angle_max;
     unsigned int gsp_laser_beam_count_;
     GMapping::OdometrySensor* gsp_odom_;
 
